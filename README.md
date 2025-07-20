@@ -1,97 +1,139 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# 📚 LearnCache
 
-# Getting Started
+A React Native mobile app that allows users to download educational websites for completely offline browsing.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## 🎯 Overview
 
-## Step 1: Start Metro
+LearnCache enables students and self-learners to download entire educational websites like W3Schools, MDN, GeeksforGeeks, and other static educational content for offline access. Perfect for areas with limited internet connectivity or for studying on the go without data concerns.
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## ✨ Features
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- **📥 Website Download**: Enter any educational website URL and download the entire site
+- **💾 Offline Storage**: All content stored locally using device storage
+- **🌐 Offline Browsing**: Browse downloaded sites using built-in WebView
+- **📱 Saved Sites Management**: View, organize, and delete downloaded sites
+- **📊 Progress Tracking**: Real-time download progress with detailed status
+- **🔍 Smart Asset Handling**: Downloads HTML, CSS, JS, images, and other static resources
 
-```sh
-# Using npm
-npm start
+## 🛠️ Technical Stack
 
-# OR using Yarn
-yarn start
+- **Framework**: React Native 0.80+
+- **Language**: TypeScript
+- **Navigation**: React Navigation v6
+- **Storage**: react-native-fs + AsyncStorage
+- **Web Browsing**: react-native-webview
+- **Archive Support**: react-native-zip-archive
+
+## 📱 Screens
+
+1. **Home Screen**: URL input and download initiation
+2. **Saved Sites**: List of all downloaded websites
+3. **Site Viewer**: Offline web browsing interface
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 16+
+- React Native development environment
+- Android Studio (for Android development)
+- Android device or emulator
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd LearnCache
 ```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+2. Install dependencies:
+```bash
+npm install
 ```
 
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+3. For Android development:
+```bash
+cd android
+./gradlew clean
+cd ..
 ```
 
-Then, and every time you update your native dependencies, run:
+4. Run the app:
+```bash
+# Start Metro bundler
+npx react-native start
 
-```sh
-bundle exec pod install
+# Run on Android (in another terminal)
+npx react-native run-android
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+## 📖 Usage
 
-```sh
-# Using npm
-npm run ios
+1. **Download a Site**:
+   - Open the app and navigate to the Home screen
+   - Enter the URL of an educational website (e.g., https://www.w3schools.com)
+   - Tap "Download Website" and wait for completion
 
-# OR using Yarn
-yarn ios
+2. **Browse Offline**:
+   - Go to "Saved Sites" to see all downloaded websites
+   - Tap on any site to open it in the offline browser
+   - Navigate within the site using standard web browsing
+
+3. **Manage Sites**:
+   - Long press on any saved site to delete it
+   - Pull down to refresh the sites list
+
+## 🎯 Supported Websites
+
+Works best with static educational websites such as:
+- W3Schools
+- MDN Web Docs  
+- GeeksforGeeks
+- Documentation sites
+- Tutorial websites
+- Reference materials
+
+## ⚠️ Limitations
+
+- Only supports static websites (no dynamic SPAs)
+- No login or authentication support
+- Limited JavaScript functionality in offline mode
+- File size depends on website complexity
+
+## 📂 Project Structure
+
+```
+src/
+├── screens/          # Main app screens
+├── components/       # Reusable UI components
+├── services/         # Core business logic
+├── types/           # TypeScript type definitions
+└── utils/           # Helper functions
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## 🔧 Configuration
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+The app includes configurable settings in `src/types/index.ts`:
+- Maximum site size limits
+- Download timeout settings
+- User agent string
 
-## Step 3: Modify your app
+## 📄 License
 
-Now that you have successfully run the app, let's make changes!
+This project is for educational purposes. Please respect website terms of service when downloading content.
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+## 🤝 Contributing
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+## 📞 Support
 
-## Congratulations! :tada:
+For issues and questions, please open an issue in the repository.
 
-You've successfully run and modified your React Native App. :partying_face:
+---
 
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+**Happy Learning!** 📚✨
