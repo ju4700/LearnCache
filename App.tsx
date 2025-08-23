@@ -1,12 +1,12 @@
 /**
  * LearnCache - Educational Website Offline Downloader
- * Download and browse educational websites completely offline
+ * Professional minimalist design for optimal learning experience
  */
 
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Alert } from 'react-native';
+import { Alert, StatusBar } from 'react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
 import SavedSitesScreen from './src/screens/SavedSitesScreen';
@@ -36,53 +36,61 @@ function App() {
   }, []);
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Home"
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '#fff',
-            elevation: 2,
-            shadowOpacity: 0.1,
-          },
-          headerTintColor: '#2c3e50',
-          headerTitleStyle: {
-            fontWeight: '600',
-            fontSize: 18,
-          },
-        }}
-      >
-        <Stack.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{
-            title: 'LearnCache',
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <NavigationContainer>
+        <Stack.Navigator
+          initialRouteName="Home"
+          screenOptions={{
             headerStyle: {
-              backgroundColor: '#f8f9fa',
+              backgroundColor: '#FFFFFF',
               elevation: 0,
               shadowOpacity: 0,
+              borderBottomWidth: 1,
+              borderBottomColor: '#F3F4F6',
+            },
+            headerTintColor: '#111827',
+            headerTitleStyle: {
+              fontWeight: '600',
+              fontSize: 18,
+              color: '#111827',
+            },
+            cardStyle: {
+              backgroundColor: '#FFFFFF',
             },
           }}
-        />
-        <Stack.Screen
-          name="SavedSites"
-          component={SavedSitesScreen}
-          options={{
-            title: 'Saved Sites',
-          }}
-        />
-        <Stack.Screen
-          name="SiteViewer"
-          component={SiteViewerScreen}
-          options={({ route }) => ({
-            title: route.params?.siteName || 'Site Viewer',
-            headerStyle: {
-              backgroundColor: '#fff',
-            },
-          })}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+        >
+          <Stack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="SavedSites"
+            component={SavedSitesScreen}
+            options={{
+              title: 'Downloaded Sites',
+            }}
+          />
+          <Stack.Screen
+            name="SiteViewer"
+            component={SiteViewerScreen}
+            options={({ route }) => ({
+              title: route.params?.siteName || 'Site Viewer',
+              headerStyle: {
+                backgroundColor: '#FFFFFF',
+                elevation: 1,
+                shadowOpacity: 0.1,
+                borderBottomWidth: 1,
+                borderBottomColor: '#E5E7EB',
+              },
+            })}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </>
   );
 }
 

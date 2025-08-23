@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   RefreshControl,
+  StatusBar,
   ActivityIndicator,
 } from 'react-native';
 import { SavedSite } from '../types';
@@ -44,6 +45,7 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
     const unsubscribe = navigation.addListener('focus', () => {
       loadSites();
     });
+
     return unsubscribe;
   }, [navigation, loadSites]);
 
@@ -55,10 +57,10 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
   const handleOpenSite = (site: SavedSite) => {
     if (site.status !== 'completed') {
       Alert.alert(
-        'Site Unavailable',
+        'Site Not Ready',
         site.status === 'downloading'
-          ? 'This site is still downloading'
-          : 'This site failed to download'
+          ? 'This site is still being downloaded. Please wait for it to complete.'
+          : 'This site failed to download. You can try downloading it again.'
       );
       return;
     }
@@ -72,7 +74,7 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
   const handleDeleteSite = (site: SavedSite) => {
     Alert.alert(
       'Delete Site',
-      `Delete "${site.name}"?`,
+      `Are you sure you want to delete "${site.name}"? This action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -93,61 +95,68 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const getStatusIndicator = (status: SavedSite['status']) => {
+  const getStatusColor = (status: SavedSite['status']) => {
     switch (status) {
       case 'completed':
-        return { color: '#10B981', text: '●' };
+        return '#28a745';
       case 'downloading':
-        return { color: '#F59E0B', text: '●' };
+        return '#ffc107';
       case 'failed':
-        return { color: '#EF4444', text: '●' };
+        return '#dc3545';
       default:
-        return { color: '#6B7280', text: '●' };
+        return '#6c757d';
     }
   };
 
-  const renderSiteItem = ({ item }: { item: SavedSite }) => {
-    const statusIndicator = getStatusIndicator(item.status);
-    
-    return (
-      <TouchableOpacity
-        style={styles.siteItem}
-        onPress={() => handleOpenSite(item)}
-        onLongPress={() => handleDeleteSite(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.siteHeader}>
-          <View style={styles.siteNameContainer}>
-            <Text style={[styles.statusIndicator, { color: statusIndicator.color }]}>
-              {statusIndicator.text}
-            </Text>
-            <Text style={styles.siteName} numberOfLines={1}>
-              {item.name}
-            </Text>
-          </View>
-        </View>
-        
-        <Text style={styles.siteUrl} numberOfLines={1}>
-          {item.originalUrl}
-        </Text>
-        
-        <View style={styles.siteInfo}>
-          <Text style={styles.infoText}>
-            {formatDate(item.downloadDate)}
-          </Text>
-          <Text style={styles.infoText}>
-            {formatFileSize(item.size)}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
+  const getStatusText = (status: SavedSite['status']) => {
+    switch (status) {
+      case 'completed':
+        return 'Ready';
+      case 'downloading':
+        return 'Downloading...';
+      case 'failed':
+        return 'Failed';
+      default:
+        return 'Unknown';
+    }
   };
+
+  const renderSiteItem = ({ item }: { item: SavedSite }) => (
+    <TouchableOpacity
+      style={styles.siteItem}
+      onPress={() => handleOpenSite(item)}
+      onLongPress={() => handleDeleteSite(item)}
+    >
+      <View style={styles.siteHeader}>
+        <Text style={styles.siteName} numberOfLines={1}>
+          {item.name}
+        </Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+        </View>
+      </View>
+      
+      <Text style={styles.siteUrl} numberOfLines={1}>
+        {item.originalUrl}
+      </Text>
+      
+      <View style={styles.siteInfo}>
+        <Text style={styles.infoText}>
+          📅 {formatDate(item.downloadDate)}
+        </Text>
+        <Text style={styles.infoText}>
+          💾 {formatFileSize(item.size)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No Downloads Yet</Text>
+      <Text style={styles.emptyIcon}>📚</Text>
+      <Text style={styles.emptyTitle}>No Sites Downloaded Yet</Text>
       <Text style={styles.emptyMessage}>
-        Start downloading educational websites from the home screen
+        Start by downloading your first educational website from the home screen!
       </Text>
       <TouchableOpacity
         style={styles.emptyButton}
@@ -161,20 +170,22 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
+        <ActivityIndicator size="large" color="#007bff" />
+        <Text style={styles.loadingText}>Loading saved sites...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {sites.length > 0 && (
-        <View style={styles.header}>
-          <Text style={styles.sitesCount}>
-            {sites.length} {sites.length === 1 ? 'site' : 'sites'}
-          </Text>
-        </View>
-      )}
+      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      
+      <View style={styles.header}>
+        <Text style={styles.title}>Saved Sites</Text>
+        <Text style={styles.subtitle}>
+          {sites.length} {sites.length === 1 ? 'site' : 'sites'} downloaded
+        </Text>
+      </View>
 
       <FlatList
         data={sites}
@@ -186,17 +197,17 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={['#3B82F6']}
-            tintColor="#3B82F6"
+            colors={['#007bff']}
+            tintColor="#007bff"
           />
         }
         showsVerticalScrollIndicator={false}
       />
       
       {sites.length > 0 && (
-        <View style={styles.footer}>
-          <Text style={styles.helpText}>
-            Tap to open • Long press to delete
+        <View style={styles.helpText}>
+          <Text style={styles.helpMessage}>
+            💡 Tap to open, long press to delete
           </Text>
         </View>
       )}
@@ -207,29 +218,37 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f8f9fa',
   },
   header: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    padding: 24,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#e9ecef',
   },
-  sitesCount: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6c757d',
   },
   listContainer: {
     padding: 16,
   },
   siteItem: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 20,
+    padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   siteHeader: {
     flexDirection: 'row',
@@ -237,24 +256,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  siteNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  statusIndicator: {
-    fontSize: 12,
-    marginRight: 8,
-  },
   siteName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: '#2c3e50',
     flex: 1,
+    marginRight: 12,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   siteUrl: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#6c757d',
     marginBottom: 12,
   },
   siteInfo: {
@@ -263,7 +284,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: '#6c757d',
   },
   emptyContainer: {
     flex: 1,
@@ -272,30 +293,34 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    padding: 32,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 12,
     textAlign: 'center',
   },
   emptyMessage: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#6c757d',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
     lineHeight: 24,
   },
   emptyButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#007bff',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   emptyButtonText: {
-    color: '#FFFFFF',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -303,17 +328,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f8f9fa',
   },
-  footer: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6c757d',
   },
   helpText: {
-    fontSize: 12,
-    color: '#9CA3AF',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+  helpMessage: {
+    fontSize: 14,
+    color: '#6c757d',
     textAlign: 'center',
   },
 });

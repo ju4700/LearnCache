@@ -231,17 +231,27 @@ class DownloadService {
   }
 
   private validateAndNormalizeUrl(url: string): string {
-    // Add https:// if no protocol is specified
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url;
-    }
-
-    // Basic URL validation
     try {
-      const urlObj = new URL(url);
+      // Clean the input
+      const cleanUrl = url.trim();
+      
+      // Add https:// if no protocol is specified
+      const urlWithProtocol = cleanUrl.match(/^https?:\/\//) 
+        ? cleanUrl 
+        : `https://${cleanUrl}`;
+
+      // Validate the URL
+      const urlObj = new URL(urlWithProtocol);
+      
+      // Ensure it's http or https
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        throw new Error('Only HTTP and HTTPS URLs are supported');
+      }
+
       return urlObj.href;
     } catch (error) {
-      throw new Error('Invalid URL format');
+      const message = error instanceof Error ? error.message : 'Invalid URL format';
+      throw new Error(`Invalid URL: ${message}`);
     }
   }
 

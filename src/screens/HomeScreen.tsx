@@ -7,12 +7,12 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  ScrollView,
-  StatusBar,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { DownloadProgress } from '../types';
 import DownloadService from '../services/DownloadService';
-import { isValidUrl } from '../utils';
 
 interface Props {
   navigation: any;
@@ -23,14 +23,40 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
 
+  const validateUrl = (input: string): boolean => {
+    try {
+      // Clean the input
+      const cleanInput = input.trim();
+      
+      // Add protocol if missing
+      const urlToTest = cleanInput.match(/^https?:\/\//) 
+        ? cleanInput 
+        : `https://${cleanInput}`;
+      
+      const urlObj = new URL(urlToTest);
+      return ['http:', 'https:'].includes(urlObj.protocol);
+    } catch {
+      return false;
+    }
+  };
+
+  const normalizeUrl = (input: string): string => {
+    const cleanInput = input.trim();
+    return cleanInput.match(/^https?:\/\//) 
+      ? cleanInput 
+      : `https://${cleanInput}`;
+  };
+
   const handleDownload = async () => {
+    Keyboard.dismiss();
+    
     if (!url.trim()) {
-      Alert.alert('Error', 'Please enter a valid URL');
+      Alert.alert('Invalid URL', 'Please enter a website URL');
       return;
     }
 
-    if (!isValidUrl(url)) {
-      Alert.alert('Error', 'Please enter a valid URL (e.g., https://www.w3schools.com)');
+    if (!validateUrl(url)) {
+      Alert.alert('Invalid URL', 'Please enter a valid website URL\n\nExample: w3schools.com');
       return;
     }
 
@@ -39,29 +65,26 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       const downloadService = DownloadService.getInstance();
+      const normalizedUrl = normalizeUrl(url);
       
       const site = await downloadService.downloadSite(
-        url,
+        normalizedUrl,
         (progress: DownloadProgress) => {
           setDownloadProgress(progress);
         }
       );
 
+      setUrl('');
       Alert.alert(
-        'Success!',
-        `${site.name} has been downloaded successfully!`,
+        'Download Complete',
+        `${site.name} is now available offline`,
         [
-          {
-            text: 'View Sites',
-            onPress: () => navigation.navigate('SavedSites'),
-          },
+          { text: 'View Sites', onPress: () => navigation.navigate('SavedSites') },
           { text: 'OK' },
         ]
       );
-
-      setUrl('');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      const message = error instanceof Error ? error.message : 'Download failed';
       Alert.alert('Download Failed', message);
     } finally {
       setIsDownloading(false);
@@ -69,222 +92,212 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const navigateToSavedSites = () => {
-    navigation.navigate('SavedSites');
-  };
+  const isValidInput = url.trim().length > 0 && validateUrl(url);
 
   return (
-    <ScrollView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
-      
-      <View style={styles.header}>
-        <Text style={styles.title}>📚 LearnCache</Text>
-        <Text style={styles.subtitle}>
-          Download educational websites for offline learning
-        </Text>
-      </View>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>LearnCache</Text>
+          <Text style={styles.subtitle}>Download websites for offline learning</Text>
+        </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Download Website</Text>
-        
-        <TextInput
-          style={styles.input}
-          placeholder="Enter website URL (e.g., https://www.w3schools.com)"
-          value={url}
-          onChangeText={setUrl}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          editable={!isDownloading}
-        />
+        {/* Main Input Section */}
+        <View style={styles.inputSection}>
+          <Text style={styles.label}>Website URL</Text>
+          <TextInput
+            style={[styles.input, isValidInput && styles.inputValid]}
+            placeholder="Enter URL (e.g., w3schools.com)"
+            placeholderTextColor="#9CA3AF"
+            value={url}
+            onChangeText={setUrl}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="url"
+            keyboardType="url"
+            editable={!isDownloading}
+            returnKeyType="done"
+            onSubmitEditing={handleDownload}
+          />
+          
+          <TouchableOpacity
+            style={[
+              styles.downloadButton,
+              (!isValidInput || isDownloading) && styles.downloadButtonDisabled
+            ]}
+            onPress={handleDownload}
+            disabled={!isValidInput || isDownloading}
+          >
+            {isDownloading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.downloadButtonText}>Download</Text>
+            )}
+          </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity
-          style={[styles.button, styles.primaryButton, isDownloading && styles.disabledButton]}
-          onPress={handleDownload}
-          disabled={isDownloading}
-        >
-          {isDownloading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.buttonText}>Download Website</Text>
-          )}
-        </TouchableOpacity>
-
+        {/* Progress Section */}
         {downloadProgress && (
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>
-              {downloadProgress.currentFile}
-            </Text>
-            <View style={styles.progressBar}>
-              <View
+          <View style={styles.progressSection}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressTitle}>Downloading...</Text>
+              <Text style={styles.progressPercent}>
+                {Math.round(downloadProgress.progress)}%
+              </Text>
+            </View>
+            
+            <View style={styles.progressBarContainer}>
+              <View 
                 style={[
-                  styles.progressFill,
-                  { width: `${downloadProgress.progress}%` },
-                ]}
+                  styles.progressBar, 
+                  { width: `${downloadProgress.progress}%` }
+                ]} 
               />
             </View>
-            <Text style={styles.progressPercent}>
-              {Math.round(downloadProgress.progress)}% Complete
+            
+            <Text style={styles.progressFile} numberOfLines={1}>
+              {downloadProgress.currentFile}
             </Text>
           </View>
         )}
-      </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Saved Websites</Text>
-        <Text style={styles.description}>
-          View and manage your downloaded websites
-        </Text>
-        
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
-          onPress={navigateToSavedSites}
-        >
-          <Text style={styles.secondaryButtonText}>View Saved Sites</Text>
-        </TouchableOpacity>
+        {/* Quick Actions */}
+        <View style={styles.actionsSection}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('SavedSites')}
+          >
+            <Text style={styles.actionButtonText}>View Downloaded Sites</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-
-      <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>💡 Tips</Text>
-        <Text style={styles.infoText}>
-          • Works best with educational sites like W3Schools, MDN, GeeksforGeeks{'\n'}
-          • Static content downloads faster and works better offline{'\n'}
-          • Make sure you have sufficient storage space{'\n'}
-          • Some sites may take several minutes to download completely
-        </Text>
-      </View>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFFFF',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 40,
   },
   header: {
-    padding: 24,
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    marginBottom: 48,
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6c757d',
+    color: '#6B7280',
     textAlign: 'center',
   },
-  card: {
-    backgroundColor: '#fff',
-    margin: 16,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  inputSection: {
+    marginBottom: 32,
   },
-  sectionTitle: {
-    fontSize: 20,
+  label: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#2c3e50',
+    color: '#374151',
     marginBottom: 12,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 8,
-    padding: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     fontSize: 16,
+    color: '#111827',
+    backgroundColor: '#F9FAFB',
     marginBottom: 16,
-    backgroundColor: '#f8f9fa',
   },
-  button: {
-    padding: 14,
-    borderRadius: 8,
+  inputValid: {
+    borderColor: '#10B981',
+    backgroundColor: '#ECFDF5',
+  },
+  downloadButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 56,
   },
-  primaryButton: {
-    backgroundColor: '#007bff',
+  downloadButtonDisabled: {
+    backgroundColor: '#D1D5DB',
   },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#007bff',
-  },
-  disabledButton: {
-    backgroundColor: '#adb5bd',
-  },
-  buttonText: {
-    color: '#fff',
+  downloadButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  secondaryButtonText: {
-    color: '#007bff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  description: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginBottom: 16,
-  },
-  progressContainer: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-  },
-  progressText: {
-    fontSize: 14,
-    color: '#495057',
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#e9ecef',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#28a745',
-    borderRadius: 3,
-  },
-  progressPercent: {
-    fontSize: 12,
-    color: '#6c757d',
-    textAlign: 'center',
-  },
-  infoCard: {
-    backgroundColor: '#e7f3ff',
-    margin: 16,
-    padding: 20,
+  progressSection: {
+    backgroundColor: '#F3F4F6',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#bee5eb',
+    padding: 20,
+    marginBottom: 32,
   },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0c5460',
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
   },
-  infoText: {
+  progressTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  progressPercent: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 4,
+  },
+  progressFile: {
     fontSize: 14,
-    color: '#0c5460',
-    lineHeight: 20,
+    color: '#6B7280',
+  },
+  actionsSection: {
+    marginTop: 'auto',
+  },
+  actionButton: {
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#374151',
   },
 });
 

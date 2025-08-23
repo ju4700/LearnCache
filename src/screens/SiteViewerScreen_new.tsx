@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -53,145 +53,31 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   }, [navigation, siteName]);
 
-  const createTestSite = useCallback(async () => {
-    try {
-      const storageService = StorageService.getInstance();
-      const testSitePath = await storageService.getSiteLocalPath('test_site');
-      await RNFS.mkdir(testSitePath);
-      
-      const testHtml = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Site</title>
-    <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 20px; 
-            line-height: 1.6;
-            background-color: #f0f0f0;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 { color: #3B82F6; }
-        .status { 
-            background: #10B981; 
-            color: white; 
-            padding: 10px; 
-            border-radius: 4px; 
-            margin: 10px 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>✅ Test Site Working!</h1>
-        <div class="status">WebView is rendering correctly</div>
-        <p>This is a test page to verify that the WebView component is working properly.</p>
-        <p>If you can see this content with proper styling, then the WebView rendering is working.</p>
-        <h2>Features Tested:</h2>
-        <ul>
-            <li>HTML structure</li>
-            <li>CSS styling</li>
-            <li>Text rendering</li>
-            <li>Basic layout</li>
-        </ul>
-        <p><strong>Created:</strong> ${new Date().toLocaleString()}</p>
-    </div>
-</body>
-</html>`;
-
-      await RNFS.writeFile(`${testSitePath}/index.html`, testHtml, 'utf8');
-      
-      // Create test site metadata
-      const testSite = {
-        id: 'test_site',
-        name: 'Test Site',
-        originalUrl: 'test://local',
-        downloadDate: new Date(),
-        localPath: testSitePath,
-        size: testHtml.length,
-        status: 'completed' as const,
-      };
-      
-      await storageService.saveSiteMetadata(testSite);
-      console.log('Test site created successfully');
-      
-    } catch (testError) {
-      console.error('Failed to create test site:', testError);
-    }
-  }, []);
-
-  const loadSiteContent = useCallback(async () => {
-    try {
-      // Create test site if in development mode and siteId is 'test_site'
-      if (__DEV__ && siteId === 'test_site') {
-        await createTestSite();
-      }
-
-      const storageService = StorageService.getInstance();
-      const sitePath = await storageService.getSiteLocalPath(siteId);
-      const indexPath = `${sitePath}/index.html`;
-
-      console.log('Loading site from path:', indexPath);
-      
-      const exists = await RNFS.exists(indexPath);
-      if (!exists) {
-        console.error('Index file does not exist:', indexPath);
-        setError('Site files not found');
-        return;
-      }
-
-      const content = await RNFS.readFile(indexPath, 'utf8');
-      console.log('HTML content loaded, length:', content.length);
-      console.log('HTML content preview:', content.substring(0, 500));
-      
-      if (!content || content.trim().length === 0) {
-        setError('Site content is empty');
-        return;
-      }
-      
-      // Basic HTML validation
-      if (!content.toLowerCase().includes('<html') && !content.toLowerCase().includes('<!doctype')) {
-        console.warn('Content does not appear to be valid HTML');
-        // Try to wrap in basic HTML structure
-        const wrappedContent = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Offline Content</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
-    </style>
-</head>
-<body>
-    ${content}
-</body>
-</html>`;
-        setHtmlContent(wrappedContent);
-      } else {
-        setHtmlContent(content);
-      }
-    } catch (loadError) {
-      console.error('Failed to load site content:', loadError);
-      const errorMessage = loadError instanceof Error ? loadError.message : 'Unknown error';
-      setError('Failed to load site content: ' + errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [siteId, createTestSite]);
-
   useEffect(() => {
+    const loadSiteContent = async () => {
+      try {
+        const storageService = StorageService.getInstance();
+        const sitePath = await storageService.getSiteLocalPath(siteId);
+        const indexPath = `${sitePath}/index.html`;
+
+        const exists = await RNFS.exists(indexPath);
+        if (!exists) {
+          setError('Site files not found');
+          return;
+        }
+
+        const content = await RNFS.readFile(indexPath, 'utf8');
+        setHtmlContent(content);
+      } catch (loadError) {
+        console.error('Failed to load site content:', loadError);
+        setError('Failed to load site content');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadSiteContent();
-  }, [loadSiteContent]);
+  }, [siteId]);
 
   // Handle hardware back button for Android
   useEffect(() => {
@@ -214,15 +100,7 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleWebViewError = (syntheticEvent: any) => {
     const { nativeEvent } = syntheticEvent;
     console.error('WebView error:', nativeEvent);
-    console.error('WebView error details:', {
-      url: nativeEvent.url,
-      code: nativeEvent.code,
-      description: nativeEvent.description,
-      domain: nativeEvent.domain,
-      canGoBack: nativeEvent.canGoBack,
-      canGoForward: nativeEvent.canGoForward,
-    });
-    setError(`WebView failed to render: ${nativeEvent.description || 'Unknown error'}`);
+    setError('Failed to load content');
   };
 
   const handleWebViewLoad = () => {
@@ -267,27 +145,12 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <WebView
         ref={(ref) => setWebViewRef(ref)}
-        source={{ 
-          html: htmlContent,
-          baseUrl: 'file:///' 
-        }}
+        source={{ html: htmlContent }}
         style={styles.webView}
         onNavigationStateChange={handleWebViewNavigationStateChange}
         onError={handleWebViewError}
-        onHttpError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          console.error('WebView HTTP error:', nativeEvent);
-          setError(`HTTP Error: ${nativeEvent.statusCode} - ${nativeEvent.description}`);
-        }}
         onLoad={handleWebViewLoad}
         onLoadEnd={handleWebViewLoad}
-        onLoadStart={() => {
-          console.log('WebView load started');
-          setWebViewLoading(true);
-        }}
-        onMessage={(event) => {
-          console.log('WebView message:', event.nativeEvent.data);
-        }}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         startInLoadingState={false}
@@ -295,20 +158,12 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={true}
         allowsBackForwardNavigationGestures={true}
-        mixedContentMode="compatibility"
-        originWhitelist={['*']}
         // Disable external links
         onShouldStartLoadWithRequest={(request) => {
           const url = request.url.toLowerCase();
-          console.log('WebView navigation request:', url);
           
           // Allow data URLs and about:blank
           if (url.startsWith('data:') || url === 'about:blank') {
-            return true;
-          }
-          
-          // Allow file URLs (for local content)
-          if (url.startsWith('file://')) {
             return true;
           }
           
