@@ -94,7 +94,7 @@ class TutorialCrawlerService {
           // Download assets for this page
           await this.downloadPageAssets(pageHtml, page.url, tutorialPath);
           
-          const pageSize = Buffer.byteLength(processedHtml, 'utf8');
+          const pageSize = new TextEncoder().encode(processedHtml).length;
           downloadedBytes += pageSize;
           
           downloadedPages.push({
@@ -391,7 +391,7 @@ class TutorialCrawlerService {
 
   private generateTutorialId(title: string, url: string): string {
     const titleHash = title.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    const urlHash = Buffer.from(url).toString('base64').slice(0, 8);
+    const urlHash = btoa(url).slice(0, 8);
     return `${titleHash}_${urlHash}`;
   }
 
@@ -444,18 +444,10 @@ class TutorialCrawlerService {
           }
 
           const response = await fetch(assetUrl);
-          const blob = await response.blob();
+          const arrayBuffer = await response.arrayBuffer();
           
-          // Convert to base64 for RNFS
-          const reader = new FileReader();
-          const base64Data = await new Promise<string>((resolve, reject) => {
-            reader.onload = () => {
-              const result = reader.result as string;
-              resolve(result.split(',')[1]);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
+          // Convert ArrayBuffer to base64
+          const base64Data = this.arrayBufferToBase64(arrayBuffer);
 
           await RNFS.writeFile(assetPath, base64Data, 'base64');
         } catch (error) {
@@ -468,6 +460,15 @@ class TutorialCrawlerService {
   private async saveTutorialMetadata(tutorial: Tutorial, tutorialPath: string): Promise<void> {
     const metadataPath = `${tutorialPath}/tutorial_metadata.json`;
     await RNFS.writeFile(metadataPath, JSON.stringify(tutorial, null, 2), 'utf8');
+  }
+
+  private arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
   }
 
   private reportProgress(
