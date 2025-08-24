@@ -30,6 +30,7 @@ export * from './Tutorial';
 export type NavigationStackParamList = {
   Home: undefined;
   SavedSites: undefined;
+  MyTutorials: undefined;
   TutorialDiscovery: undefined;
   TutorialViewer: {
     tutorialPath: string;

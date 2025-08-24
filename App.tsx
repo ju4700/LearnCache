@@ -10,6 +10,7 @@ import { Alert, StatusBar } from 'react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
 import SavedSitesScreen from './src/screens/SavedSitesScreen';
+import MyTutorialsScreen from './src/screens/MyTutorialsScreen';
 import SiteViewerScreen from './src/screens/SiteViewerScreen';
 import TutorialDiscoveryScreen from './src/screens/TutorialDiscoveryScreen';
 import TutorialViewerScreen from './src/screens/TutorialViewerScreen';
@@ -74,6 +75,13 @@ function App() {
             component={SavedSitesScreen}
             options={{
               title: 'Downloaded Sites',
+            }}
+          />
+          <Stack.Screen
+            name="MyTutorials"
+            component={MyTutorialsScreen}
+            options={{
+              title: 'My Tutorials',
             }}
           />
           <Stack.Screen

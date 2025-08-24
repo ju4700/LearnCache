@@ -175,6 +175,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
           
           <TouchableOpacity
+            style={styles.secondaryActionButton}
+            onPress={() => navigation.navigate('MyTutorials')}
+          >
+            <Text style={styles.secondaryActionButtonText}>📚 My Tutorials</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('SavedSites')}
           >
@@ -301,6 +308,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryActionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  secondaryActionButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  secondaryActionButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
