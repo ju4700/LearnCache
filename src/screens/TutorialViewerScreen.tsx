@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import RNFS from 'react-native-fs';
+import OfflineServerService from '../services/OfflineServerService';
 
 interface Props {
   navigation: any;
@@ -27,8 +28,33 @@ const TutorialViewerScreen: React.FC<Props> = ({ navigation, route }) => {
   const [webViewLoading, setWebViewLoading] = useState(true);
   const [canGoBack, setCanGoBack] = useState(false);
   const [indexHtmlContent, setIndexHtmlContent] = useState<string | null>(null);
+  const [useLocalServer, setUseLocalServer] = useState(false);
+  const [serverUrl, setServerUrl] = useState<string | null>(null);
   
   const webViewRef = useRef<WebView>(null);
+  const offlineServerService = OfflineServerService.getInstance();
+
+  // Clean up server when component unmounts
+  useEffect(() => {
+    return () => {
+      if (useLocalServer) {
+        offlineServerService.stopServer();
+      }
+    };
+  }, [useLocalServer, offlineServerService]);
+
+  // Try to start local server for complex sites
+  const tryUseLocalServer = useCallback(async () => {
+    try {
+      const url = await offlineServerService.startTutorialServer(tutorialPath);
+      setServerUrl(url);
+      setUseLocalServer(true);
+      return true;
+    } catch (serverError) {
+      console.warn('Failed to start local server, falling back to file system:', serverError);
+      return false;
+    }
+  }, [tutorialPath, offlineServerService]);
 
   // Load tutorial index content
   useEffect(() => {
@@ -43,26 +69,12 @@ const TutorialViewerScreen: React.FC<Props> = ({ navigation, route }) => {
           throw new Error('Tutorial not found');
         }
 
-        // Try to load index.html first
-        const indexPath = `${tutorialPath}/index.html`;
-        const indexExists = await RNFS.exists(indexPath);
+        // Try to use local server first for better compatibility
+        const serverStarted = await tryUseLocalServer();
         
-        if (indexExists) {
-          const indexContent = await RNFS.readFile(indexPath, 'utf8');
-          setIndexHtmlContent(indexContent);
-        } else {
-          // If no index, look for tutorial metadata and create a simple index
-          const metadataPath = `${tutorialPath}/tutorial_metadata.json`;
-          const metadataExists = await RNFS.exists(metadataPath);
-          
-          if (metadataExists) {
-            const metadataContent = await RNFS.readFile(metadataPath, 'utf8');
-            const tutorial = JSON.parse(metadataContent);
-            const simpleIndex = await createSimpleIndex(tutorial, tutorialPath);
-            setIndexHtmlContent(simpleIndex);
-          } else {
-            throw new Error('No tutorial content found');
-          }
+        if (!serverStarted) {
+          // Fallback to file system loading
+          await loadFromFileSystem();
         }
 
       } catch (loadError) {
@@ -73,8 +85,32 @@ const TutorialViewerScreen: React.FC<Props> = ({ navigation, route }) => {
       }
     };
 
+    const loadFromFileSystem = async () => {
+      // Try to load index.html first
+      const indexPath = `${tutorialPath}/index.html`;
+      const indexExists = await RNFS.exists(indexPath);
+      
+      if (indexExists) {
+        const indexContent = await RNFS.readFile(indexPath, 'utf8');
+        setIndexHtmlContent(indexContent);
+      } else {
+        // If no index, look for tutorial metadata and create a simple index
+        const metadataPath = `${tutorialPath}/tutorial_metadata.json`;
+        const metadataExists = await RNFS.exists(metadataPath);
+        
+        if (metadataExists) {
+          const metadataContent = await RNFS.readFile(metadataPath, 'utf8');
+          const tutorial = JSON.parse(metadataContent);
+          const simpleIndex = await createSimpleIndex(tutorial, tutorialPath);
+          setIndexHtmlContent(simpleIndex);
+        } else {
+          throw new Error('No tutorial content found');
+        }
+      }
+    };
+
     loadTutorialContent();
-  }, [tutorialPath]);
+  }, [tutorialPath, tryUseLocalServer]);
 
   // Handle hardware back button for Android
   useEffect(() => {
@@ -193,10 +229,13 @@ const TutorialViewerScreen: React.FC<Props> = ({ navigation, route }) => {
     <View style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ 
-          html: indexHtmlContent,
-          baseUrl: `file://${tutorialPath}/`
-        }}
+        source={useLocalServer && serverUrl ? 
+          { uri: serverUrl } : 
+          { 
+            html: indexHtmlContent,
+            baseUrl: `file://${tutorialPath}/`
+          }
+        }
         style={styles.webView}
         onNavigationStateChange={handleWebViewNavigationStateChange}
         onError={handleWebViewError}
@@ -218,7 +257,9 @@ const TutorialViewerScreen: React.FC<Props> = ({ navigation, route }) => {
       {webViewLoading && (
         <View style={styles.webViewLoadingOverlay}>
           <ActivityIndicator size="large" color="#3B82F6" />
-          <Text style={styles.webViewLoadingText}>Loading content...</Text>
+          <Text style={styles.webViewLoadingText}>
+            {useLocalServer ? 'Starting local server...' : 'Loading content...'}
+          </Text>
         </View>
       )}
 

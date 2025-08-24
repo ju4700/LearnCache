@@ -1,6 +1,8 @@
 import { Tutorial, TutorialPage, SiteCrawlResult, TutorialDownloadProgress } from '../types';
 import RNFS from 'react-native-fs';
 import StorageService from './StorageService';
+import { parse } from 'node-html-parser';
+import RNBlobUtil from 'react-native-blob-util';
 
 class TutorialCrawlerService {
   private static instance: TutorialCrawlerService;
@@ -261,6 +263,42 @@ class TutorialCrawlerService {
   }
 
   private processPageForOffline(html: string, pageUrl: string, baseUrl: string): string {
+    try {
+      // Parse HTML with node-html-parser for better performance
+      const document = parse(html);
+      
+      // Process all resource links (images, CSS, JS)
+      const resourceElements = document.querySelectorAll('img, link[rel="stylesheet"], script[src]');
+      resourceElements.forEach(element => {
+        const srcAttr = element.getAttribute('src') || element.getAttribute('href');
+        if (srcAttr && this.isAssetUrl(srcAttr)) {
+          const fileName = this.extractFileName(srcAttr);
+          const newPath = `./assets/${fileName}`;
+          
+          if (element.getAttribute('src')) {
+            element.setAttribute('src', newPath);
+          } else if (element.getAttribute('href')) {
+            element.setAttribute('href', newPath);
+          }
+        }
+      });
+      
+      // Add offline navigation to body
+      const body = document.querySelector('body');
+      if (body) {
+        const tutorialNav = this.createOfflineNavigation(pageUrl, baseUrl);
+        body.insertAdjacentHTML('afterbegin', tutorialNav);
+      }
+      
+      return document.toString();
+      
+    } catch (error) {
+      console.warn('Failed to parse HTML with node-html-parser, falling back to regex:', error);
+      return this.processPageForOfflineFallback(html, pageUrl, baseUrl);
+    }
+  }
+
+  private processPageForOfflineFallback(html: string, pageUrl: string, baseUrl: string): string {
     let processedHtml = html;
     
     // Replace relative asset URLs with local paths
@@ -409,6 +447,12 @@ class TutorialCrawlerService {
     }
   }
 
+  private isAssetUrl(url: string): boolean {
+    const assetExtensions = ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot'];
+    const urlLower = url.toLowerCase();
+    return assetExtensions.some(ext => urlLower.includes(ext));
+  }
+
   private resolveUrl(relativeUrl: string, baseUrl: string): string {
     try {
       return new URL(relativeUrl, baseUrl).href;
@@ -425,16 +469,17 @@ class TutorialCrawlerService {
       await RNFS.mkdir(assetsPath);
     }
 
-    // Extract and download images, CSS, JS
-    const assetPatterns = [
-      /(?:src|href)=["']([^"']+\.(css|js|png|jpg|jpeg|gif|svg|ico))[^"']*["']/gi
-    ];
-
-    for (const pattern of assetPatterns) {
-      let match;
-      while ((match = pattern.exec(html)) !== null) {
+    // Parse HTML to find assets using node-html-parser
+    try {
+      const document = parse(html);
+      const assetElements = document.querySelectorAll('img[src], link[href*=".css"], script[src*=".js"]');
+      
+      for (const element of assetElements) {
         try {
-          const assetUrl = this.resolveUrl(match[1], pageUrl);
+          const assetUrl = element.getAttribute('src') || element.getAttribute('href');
+          if (!assetUrl || !this.isAssetUrl(assetUrl)) continue;
+          
+          const fullAssetUrl = this.resolveUrl(assetUrl, pageUrl);
           const fileName = this.extractFileName(assetUrl);
           const assetPath = `${assetsPath}/${fileName}`;
 
@@ -443,15 +488,48 @@ class TutorialCrawlerService {
             continue;
           }
 
-          const response = await fetch(assetUrl);
-          const arrayBuffer = await response.arrayBuffer();
+          // Use react-native-blob-util for better binary file handling
+          const response = await RNBlobUtil.fetch('GET', fullAssetUrl);
           
-          // Convert ArrayBuffer to base64
-          const base64Data = this.arrayBufferToBase64(arrayBuffer);
-
-          await RNFS.writeFile(assetPath, base64Data, 'base64');
+          if (response.info().status === 200) {
+            // Save directly to file system
+            await RNFS.writeFile(assetPath, response.base64(), 'base64');
+          }
+          
         } catch (error) {
           console.warn('Failed to download asset:', error);
+        }
+      }
+      
+    } catch (parseError) {
+      console.warn('Failed to parse HTML for assets, falling back to regex:', parseError);
+      
+      // Fallback to regex-based asset extraction
+      const assetPatterns = [
+        /(?:src|href)=["']([^"']+\.(css|js|png|jpg|jpeg|gif|svg|ico))[^"']*["']/gi
+      ];
+
+      for (const pattern of assetPatterns) {
+        let match;
+        while ((match = pattern.exec(html)) !== null) {
+          try {
+            const assetUrl = this.resolveUrl(match[1], pageUrl);
+            const fileName = this.extractFileName(assetUrl);
+            const assetPath = `${assetsPath}/${fileName}`;
+
+            // Skip if already exists
+            if (await RNFS.exists(assetPath)) {
+              continue;
+            }
+
+            const response = await RNBlobUtil.fetch('GET', assetUrl);
+            if (response.info().status === 200) {
+              await RNFS.writeFile(assetPath, response.base64(), 'base64');
+            }
+            
+          } catch (error) {
+            console.warn('Failed to download asset:', error);
+          }
         }
       }
     }
