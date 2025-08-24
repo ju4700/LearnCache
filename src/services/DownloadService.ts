@@ -221,6 +221,37 @@ class DownloadService {
       }
     );
 
+    // Disable internal navigation links to prevent errors
+    // This replaces href attributes for internal site links with a disabled version
+    processedHtml = processedHtml.replace(
+      /href=["'](?!https?:\/\/|mailto:|tel:|#)([^"']+)["']/gi,
+      (match, url) => {
+        // Skip if it's already an asset or the current page
+        if (url.includes('.css') || url.includes('.js') || url.includes('.png') || 
+            url.includes('.jpg') || url.includes('.jpeg') || url.includes('.gif') || 
+            url.includes('.svg') || url.includes('.ico') || url === '#') {
+          return match;
+        }
+        
+        // Replace with a disabled link that shows helpful text
+        const linkText = url.replace(/^\/+/, '').replace(/-/g, ' ').replace(/\//g, ' > ');
+        return `href="#" onclick="alert('This tutorial (${linkText}) is not available offline. Download individual tutorials separately or use the full site download feature.'); return false;"`;
+      }
+    );
+
+    // Add a notice at the top of the page about offline limitations
+    const offlineNotice = `
+      <div style="background-color: #FEF3C7; border: 1px solid #F59E0B; border-radius: 4px; padding: 12px; margin: 16px 0; font-family: Arial, sans-serif;">
+        <strong>📱 Offline Mode:</strong> You're viewing this content offline. Some links and features may not work. 
+        <a href="#" onclick="alert('To access more tutorials, return to the app and download additional sites.'); return false;" style="color: #D97706; text-decoration: underline;">Learn more</a>
+      </div>
+    `;
+    
+    // Insert the notice after the opening body tag
+    processedHtml = processedHtml.replace(/<body[^>]*>/i, (match) => {
+      return match + offlineNotice;
+    });
+
     return processedHtml;
   }
 

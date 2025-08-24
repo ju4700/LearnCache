@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -28,141 +28,57 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
   const [htmlContent, setHtmlContent] = useState<string>('');
   const [webViewLoading, setWebViewLoading] = useState(true);
   const [canGoBack, setCanGoBack] = useState(false);
-  const [webViewRef, setWebViewRef] = useState<WebView | null>(null);
   const [error, setError] = useState<string>('');
+  
+  // Use ref for WebView to avoid state update loops
+  const webViewRef = useRef<WebView>(null);
 
+  // Set up header title
   useEffect(() => {
-    const showSiteInfo = () => {
-      Alert.alert(
-        'Site Info',
-        `Viewing: ${siteName}\nStored offline for learning`,
-        [{ text: 'OK' }]
-      );
-    };
-
     navigation.setOptions({
       title: siteName,
-      headerRight: () => (
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={showSiteInfo}
-        >
-          <Text style={styles.headerButtonText}>ⓘ</Text>
-        </TouchableOpacity>
-      ),
     });
   }, [navigation, siteName]);
 
-  const createTestSite = useCallback(async () => {
-    try {
-      const storageService = StorageService.getInstance();
-      const testSitePath = await storageService.getSiteLocalPath('test_site');
-      await RNFS.mkdir(testSitePath);
-      
-      const testHtml = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Site</title>
-    <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 20px; 
-            line-height: 1.6;
-            background-color: #f0f0f0;
+  // Load site content once on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadContent = async () => {
+      try {
+        const storageService = StorageService.getInstance();
+        const sitePath = await storageService.getSiteLocalPath(siteId);
+        const indexPath = `${sitePath}/index.html`;
+
+        console.log('Loading site from path:', indexPath);
+        
+        const exists = await RNFS.exists(indexPath);
+        if (!exists) {
+          console.error('Index file does not exist:', indexPath);
+          if (isMounted) {
+            setError('Site files not found');
+            setLoading(false);
+          }
+          return;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+
+        const content = await RNFS.readFile(indexPath, 'utf8');
+        console.log('HTML content loaded, length:', content.length);
+        console.log('HTML content preview:', content.substring(0, 500));
+        
+        if (!content || content.trim().length === 0) {
+          if (isMounted) {
+            setError('Site content is empty');
+            setLoading(false);
+          }
+          return;
         }
-        h1 { color: #3B82F6; }
-        .status { 
-            background: #10B981; 
-            color: white; 
-            padding: 10px; 
-            border-radius: 4px; 
-            margin: 10px 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>✅ Test Site Working!</h1>
-        <div class="status">WebView is rendering correctly</div>
-        <p>This is a test page to verify that the WebView component is working properly.</p>
-        <p>If you can see this content with proper styling, then the WebView rendering is working.</p>
-        <h2>Features Tested:</h2>
-        <ul>
-            <li>HTML structure</li>
-            <li>CSS styling</li>
-            <li>Text rendering</li>
-            <li>Basic layout</li>
-        </ul>
-        <p><strong>Created:</strong> ${new Date().toLocaleString()}</p>
-    </div>
-</body>
-</html>`;
-
-      await RNFS.writeFile(`${testSitePath}/index.html`, testHtml, 'utf8');
-      
-      // Create test site metadata
-      const testSite = {
-        id: 'test_site',
-        name: 'Test Site',
-        originalUrl: 'test://local',
-        downloadDate: new Date(),
-        localPath: testSitePath,
-        size: testHtml.length,
-        status: 'completed' as const,
-      };
-      
-      await storageService.saveSiteMetadata(testSite);
-      console.log('Test site created successfully');
-      
-    } catch (testError) {
-      console.error('Failed to create test site:', testError);
-    }
-  }, []);
-
-  const loadSiteContent = useCallback(async () => {
-    try {
-      // Create test site if in development mode and siteId is 'test_site'
-      if (__DEV__ && siteId === 'test_site') {
-        await createTestSite();
-      }
-
-      const storageService = StorageService.getInstance();
-      const sitePath = await storageService.getSiteLocalPath(siteId);
-      const indexPath = `${sitePath}/index.html`;
-
-      console.log('Loading site from path:', indexPath);
-      
-      const exists = await RNFS.exists(indexPath);
-      if (!exists) {
-        console.error('Index file does not exist:', indexPath);
-        setError('Site files not found');
-        return;
-      }
-
-      const content = await RNFS.readFile(indexPath, 'utf8');
-      console.log('HTML content loaded, length:', content.length);
-      console.log('HTML content preview:', content.substring(0, 500));
-      
-      if (!content || content.trim().length === 0) {
-        setError('Site content is empty');
-        return;
-      }
-      
-      // Basic HTML validation
-      if (!content.toLowerCase().includes('<html') && !content.toLowerCase().includes('<!doctype')) {
-        console.warn('Content does not appear to be valid HTML');
-        // Try to wrap in basic HTML structure
-        const wrappedContent = `<!DOCTYPE html>
+        
+        // Basic HTML validation and wrapping if needed
+        let processedContent = content;
+        if (!content.toLowerCase().includes('<html') && !content.toLowerCase().includes('<!doctype')) {
+          console.warn('Content does not appear to be valid HTML, wrapping...');
+          processedContent = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -176,28 +92,34 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
     ${content}
 </body>
 </html>`;
-        setHtmlContent(wrappedContent);
-      } else {
-        setHtmlContent(content);
+        }
+        
+        if (isMounted) {
+          setHtmlContent(processedContent);
+          setLoading(false);
+        }
+      } catch (loadError) {
+        console.error('Failed to load site content:', loadError);
+        if (isMounted) {
+          const errorMessage = loadError instanceof Error ? loadError.message : 'Unknown error';
+          setError('Failed to load site content: ' + errorMessage);
+          setLoading(false);
+        }
       }
-    } catch (loadError) {
-      console.error('Failed to load site content:', loadError);
-      const errorMessage = loadError instanceof Error ? loadError.message : 'Unknown error';
-      setError('Failed to load site content: ' + errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  }, [siteId, createTestSite]);
+    };
 
-  useEffect(() => {
-    loadSiteContent();
-  }, [loadSiteContent]);
+    loadContent();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [siteId]); // Only depend on siteId
 
   // Handle hardware back button for Android
   useEffect(() => {
     const handleBackPress = () => {
-      if (canGoBack && webViewRef) {
-        webViewRef.goBack();
+      if (canGoBack && webViewRef.current) {
+        webViewRef.current.goBack();
         return true; // Prevent default back action
       }
       return false; // Allow default back action
@@ -205,7 +127,7 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
     return () => backHandler.remove();
-  }, [canGoBack, webViewRef]);
+  }, [canGoBack]);
 
   const handleWebViewNavigationStateChange = (navState: any) => {
     setCanGoBack(navState.canGoBack);
@@ -227,6 +149,17 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleWebViewLoad = () => {
     setWebViewLoading(false);
+  };
+
+  const handleWebViewLoadStart = () => {
+    console.log('WebView load started');
+    setWebViewLoading(true);
+  };
+
+  const handleGoBack = () => {
+    if (webViewRef.current) {
+      webViewRef.current.goBack();
+    }
   };
 
   if (loading) {
@@ -266,7 +199,7 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
       )}
 
       <WebView
-        ref={(ref) => setWebViewRef(ref)}
+        ref={webViewRef}
         source={{ 
           html: htmlContent,
           baseUrl: 'file:///' 
@@ -281,10 +214,7 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
         }}
         onLoad={handleWebViewLoad}
         onLoadEnd={handleWebViewLoad}
-        onLoadStart={() => {
-          console.log('WebView load started');
-          setWebViewLoading(true);
-        }}
+        onLoadStart={handleWebViewLoadStart}
         onMessage={(event) => {
           console.log('WebView message:', event.nativeEvent.data);
         }}
@@ -297,7 +227,6 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
         allowsBackForwardNavigationGestures={true}
         mixedContentMode="compatibility"
         originWhitelist={['*']}
-        // Disable external links
         onShouldStartLoadWithRequest={(request) => {
           const url = request.url.toLowerCase();
           console.log('WebView navigation request:', url);
@@ -307,8 +236,17 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
             return true;
           }
           
-          // Allow file URLs (for local content)
+          // Handle file URLs - check if they're trying to navigate to relative paths
           if (url.startsWith('file://')) {
+            // If it's a simple file path like file:///python-tutorial, it's likely a broken relative link
+            if (url.match(/^file:\/\/\/[^/]+$/) && !url.includes('.html')) {
+              Alert.alert(
+                'Page Not Available',
+                'This tutorial page was not downloaded or is not available offline. Try downloading the complete site or check if this specific page exists.',
+                [{ text: 'OK' }]
+              );
+              return false;
+            }
             return true;
           }
           
@@ -322,14 +260,20 @@ const SiteViewerScreen: React.FC<Props> = ({ navigation, route }) => {
             return false;
           }
           
-          return true;
+          // For any other navigation attempts, show a helpful message
+          Alert.alert(
+            'Navigation Not Available',
+            'This content is not available offline. Only the main page content can be viewed.',
+            [{ text: 'OK' }]
+          );
+          return false;
         }}
       />
 
       {canGoBack && (
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => webViewRef?.goBack()}
+          onPress={handleGoBack}
         >
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
@@ -411,19 +355,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  headerButton: {
-    marginRight: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerButtonText: {
-    fontSize: 16,
-    color: '#6B7280',
   },
   backButton: {
     position: 'absolute',

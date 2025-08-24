@@ -168,6 +168,13 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* Quick Actions */}
         <View style={styles.actionsSection}>
           <TouchableOpacity
+            style={styles.primaryActionButton}
+            onPress={() => navigation.navigate('TutorialDiscovery')}
+          >
+            <Text style={styles.primaryActionButtonText}>🔍 Discover Tutorials</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('SavedSites')}
           >
@@ -285,6 +292,18 @@ const styles = StyleSheet.create({
   },
   actionsSection: {
     marginTop: 'auto',
+    gap: 12,
+  },
+  primaryActionButton: {
+    backgroundColor: '#28a745',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  primaryActionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   actionButton: {
     borderWidth: 2,

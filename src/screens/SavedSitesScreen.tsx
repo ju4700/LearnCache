@@ -12,6 +12,7 @@ import {
 import { SavedSite } from '../types';
 import StorageService from '../services/StorageService';
 import { formatDate, formatFileSize } from '../utils';
+import RNFS from 'react-native-fs';
 
 interface Props {
   navigation: any;
@@ -21,12 +22,39 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
   const [sites, setSites] = useState<SavedSite[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [tutorialIds, setTutorialIds] = useState<Set<string>>(new Set());
+
+  // Check if a site is a tutorial by looking for tutorial metadata
+  const checkIsTutorial = useCallback(async (site: SavedSite): Promise<boolean> => {
+    try {
+      const metadataPath = `${site.localPath}/tutorial_metadata.json`;
+      const exists = await RNFS.exists(metadataPath);
+      return exists;
+    } catch {
+      return false;
+    }
+  }, []);
 
   const loadSites = useCallback(async () => {
     try {
       const storageService = StorageService.getInstance();
       const savedSites = await storageService.getSavedSites();
-      setSites(savedSites.sort((a, b) => b.downloadDate.getTime() - a.downloadDate.getTime()));
+      const sortedSites = savedSites.sort((a, b) => b.downloadDate.getTime() - a.downloadDate.getTime());
+      setSites(sortedSites);
+      
+      // Check which sites are tutorials
+      const tutorialChecks = await Promise.all(
+        sortedSites.map(async (site) => ({
+          id: site.id,
+          isTutorial: await checkIsTutorial(site)
+        }))
+      );
+      
+      const newTutorialIds = new Set(
+        tutorialChecks.filter(check => check.isTutorial).map(check => check.id)
+      );
+      setTutorialIds(newTutorialIds);
+      
     } catch (error) {
       console.error('Failed to load sites:', error);
       Alert.alert('Error', 'Failed to load saved sites');
@@ -34,7 +62,7 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [checkIsTutorial]);
 
   useEffect(() => {
     loadSites();
@@ -52,7 +80,7 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
     loadSites();
   };
 
-  const handleOpenSite = (site: SavedSite) => {
+  const handleOpenSite = async (site: SavedSite) => {
     if (site.status !== 'completed') {
       Alert.alert(
         'Site Unavailable',
@@ -63,10 +91,22 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    navigation.navigate('SiteViewer', {
-      siteId: site.id,
-      siteName: site.name,
-    });
+    // Check if this is a tutorial
+    const isTutorial = await checkIsTutorial(site);
+    
+    if (isTutorial) {
+      // Navigate to TutorialViewer for tutorials
+      navigation.navigate('TutorialViewer', {
+        tutorialPath: site.localPath,
+        tutorialTitle: site.name,
+      });
+    } else {
+      // Navigate to regular SiteViewer for websites
+      navigation.navigate('SiteViewer', {
+        siteId: site.id,
+        siteName: site.name,
+      });
+    }
   };
 
   const handleDeleteSite = (site: SavedSite) => {
@@ -108,6 +148,7 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
 
   const renderSiteItem = ({ item }: { item: SavedSite }) => {
     const statusIndicator = getStatusIndicator(item.status);
+    const isTutorial = tutorialIds.has(item.id);
     
     return (
       <TouchableOpacity
@@ -121,6 +162,9 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={[styles.statusIndicator, { color: statusIndicator.color }]}>
               {statusIndicator.text}
             </Text>
+            {isTutorial && (
+              <Text style={styles.tutorialBadge}>📚</Text>
+            )}
             <Text style={styles.siteName} numberOfLines={1}>
               {item.name}
             </Text>
@@ -138,6 +182,9 @@ const SavedSitesScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.infoText}>
             {formatFileSize(item.size)}
           </Text>
+          {isTutorial && (
+            <Text style={styles.tutorialLabel}>Tutorial</Text>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -264,6 +311,19 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 12,
     color: '#9CA3AF',
+  },
+  tutorialBadge: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+  tutorialLabel: {
+    fontSize: 11,
+    color: '#007bff',
+    fontWeight: '600',
+    backgroundColor: '#e3f2fd',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   emptyContainer: {
     flex: 1,

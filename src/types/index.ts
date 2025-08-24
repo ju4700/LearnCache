@@ -24,9 +24,17 @@ export interface StorageInfo {
   usedSize: number;
 }
 
+// Re-export tutorial types
+export * from './Tutorial';
+
 export type NavigationStackParamList = {
   Home: undefined;
   SavedSites: undefined;
+  TutorialDiscovery: undefined;
+  TutorialViewer: {
+    tutorialPath: string;
+    tutorialTitle: string;
+  };
   SiteViewer: {
     siteId: string;
     siteName: string;

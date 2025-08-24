@@ -11,6 +11,8 @@ import { Alert, StatusBar } from 'react-native';
 import HomeScreen from './src/screens/HomeScreen';
 import SavedSitesScreen from './src/screens/SavedSitesScreen';
 import SiteViewerScreen from './src/screens/SiteViewerScreen';
+import TutorialDiscoveryScreen from './src/screens/TutorialDiscoveryScreen';
+import TutorialViewerScreen from './src/screens/TutorialViewerScreen';
 import StorageService from './src/services/StorageService';
 import { NavigationStackParamList } from './src/types';
 
@@ -73,6 +75,27 @@ function App() {
             options={{
               title: 'Downloaded Sites',
             }}
+          />
+          <Stack.Screen
+            name="TutorialDiscovery"
+            component={TutorialDiscoveryScreen}
+            options={{
+              title: 'Tutorial Discovery',
+            }}
+          />
+          <Stack.Screen
+            name="TutorialViewer"
+            component={TutorialViewerScreen}
+            options={({ route }) => ({
+              title: route.params?.tutorialTitle || 'Tutorial',
+              headerStyle: {
+                backgroundColor: '#FFFFFF',
+                elevation: 1,
+                shadowOpacity: 0.1,
+                borderBottomWidth: 1,
+                borderBottomColor: '#E5E7EB',
+              },
+            })}
           />
           <Stack.Screen
             name="SiteViewer"
